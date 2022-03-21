@@ -1,0 +1,11 @@
+[submodule "adapter_lib"]
+	path = adapter_lib
+	url = git@github.com:oqton/iot-connect-py-adapterlib.git
+	branch = master
+[submodule "fos_lib"]
+	path = fos_lib
+	url = git@github.com:oqton/iot-fos-py-lib.git
+	branch = master
+[submodule "hydraproto"]
+	path = hydraproto
+	url = git@github.com:oqton/3dconnect-hydra-python-sdk.git
