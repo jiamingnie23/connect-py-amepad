@@ -12,7 +12,7 @@ import random
 
 class StatusCode(Enum):
     StandBy = 1
-    Printing = 2
+    Printing = 2 #Stated or Not 
     Paused = 3 
     
 class Machine(object):
@@ -39,13 +39,7 @@ class MachineImpl(Machine) :
     def __init__(self) :
         self.name = "AMPS1200"
         self.ip = "192.168.0.2"
-        self.workTimeBeforeError = 0.3
-        self.repairTime = 0.4
-        self.workTimeAfterError = 0.5
-        self.completeTime = 0.3
-        self.StatusCode = StatusCode.Notknown
-        self.StartOxygenValue = 90
-        self.TargetOxygenValue = random.uniform(0, 1)
+        self.StatusCode = StatusCode.StandBy
         self.estimatedDuration = 0
         self.totalLayers = 0
         self._reset()
@@ -53,8 +47,7 @@ class MachineImpl(Machine) :
         
     def _prepare(self, progress) :
         self.StatusCode = StatusCode.Preparation
-        self.OxygenValue = self.StartOxygenValue + (self.TargetOxygenValue - self.StartOxygenValue) * progress
-
+        
     def _doWorkBefore(self, progress) :
         self.StatusCode = StatusCode.Working
         self.currentLayer = int(progress * self.totalLayers / 2)
@@ -71,8 +64,7 @@ class MachineImpl(Machine) :
         self.StatusCode = StatusCode.Complete
 
     def _reset(self) :
-        self.OxygenValue = self.StartOxygenValue
-        self.StatusCode = StatusCode.Notknown
+        self.StatusCode = StatusCode.StandBy
         self.startTime = getTime()
         self.currentLayer = 0
         self.totalLayers = random.randint(500, 1600)
@@ -123,76 +115,62 @@ class MachineImpl(Machine) :
 
             self._reset()
             
-class ServerConfiguration(object) :
-    def __init__(self) :
-        self.requests = []
-
-    def AddRequest(self, request) :
-        if (request is not None) :
-            self.requests.append(request)
-
-    def ProcessRequest(self, req, action) :
-        for _req in self.requests:
-            if (_req.isInterested(req, action)) :
-                return _req.GetResponse(req, action)
-
-        return None
     
 #####################################################
 # The request and response configuration
-class Request(object) :
-    def __init__(self, req, action, response):
-        self.req = req
-        self.action = action
-        self.response = response
+# class Request(object) :
+#     def __init__(self, req, action, response):
+#         self.req = req
+#         self.action = action
+#         self.response = response
 
-    def isInterested(self, req, action) :
-        if (self.req.lower() == req.lower() and self.action.lower() == action.lower()) :
-            return True
-        return False
+#     def isInterested(self, req, action) :
+#         if (self.req.lower() == req.lower() and self.action.lower() == action.lower()) :
+#             return True
+#         return False
 
-    def GetResponse(self) :
-        return self.response
+#     def GetResponse(self) :
+#         return self.response
 
-class BulkRequest(object):
-    def __init__(self):
-        self.simpleRequest = {
-            "?Q100": "SERIAL NUMBER, 1234567",
-            "?Q101": "SOFTWARE VERSION, 100.16.000.1031",
-            "?Q102": "MODEL, CSMD-G2",
-            "?Q104": "MODE, ZERO",
-            "?Q200": self.toolChangesFunc,
-            "?Q201": self.toolUsedFunc,
-            "?Q300": "P.O. TIME, 06282:17:13",
-            "?Q301": "C.S. TIME, 00098:18:29",
-            "?Q303": "LAST CYCLE, 00000:00:13",
-            "?Q304": "PREV CYCLE, 00000:00:01",
-            "?Q402": "M30 #1, 380",
-            "?Q403": "M30 #2, 380",
-            "?Q500": self.programFunc
-        }
+# class BulkRequest(object):
+#     def __init__(self):
+#         self.simpleRequest = {
+#             "?Q100": "SERIAL NUMBER, 1234567",
+#             "?Q101": "SOFTWARE VERSION, 100.16.000.1031",
+#             "?Q102": "MODEL, CSMD-G2",
+#             "?Q104": "MODE, ZERO",
+#             "?Q200": self.toolChangesFunc,
+#             "?Q201": self.toolUsedFunc,
+#             "?Q300": "P.O. TIME, 06282:17:13",
+#             "?Q301": "C.S. TIME, 00098:18:29",
+#             "?Q303": "LAST CYCLE, 00000:00:13",
+#             "?Q304": "PREV CYCLE, 00000:00:01",
+#             "?Q402": "M30 #1, 380",
+#             "?Q403": "M30 #2, 380",
+#             "?Q500": self.programFunc
+#         }
 
-    def toolChangesFunc(self):
-        return "TOOL CHANGES, " + str(random.randint(9, 15))
+#     def toolChangesFunc(self):
+#         return "TOOL CHANGES, " + str(random.randint(9, 15))
 
-    def toolUsedFunc(self):
-        return "USING TOOL, " + str(random.randint(1, 5))
+#     def toolUsedFunc(self):
+#         return "USING TOOL, " + str(random.randint(1, 5))
 
-    def programFunc(self):
-        status = ['IDLE', "FEED HOLD"]
-        return "PROGRAM, MDI, %s, PARTS, %s" % (status[random.randint(0, 1)], str(random.randint(1, 50)))
+#     def programFunc(self):
+#         status = ['IDLE', "FEED HOLD"]
+#         return "PROGRAM, MDI, %s, PARTS, %s" % (status[random.randint(0, 1)], str(random.randint(1, 50)))
 
-    def isInterested(self, req, action) :
-        if req in self.simpleRequest:
-            return True
+#     def isInterested(self, req, action) :
+#         if req in self.simpleRequest:
+#             return True
 
-        return False
+#         return False
 
-    def GetResponse(self, req, action) :
-        res = self.simpleRequest[req]
-        if (callable(res)):
-            return StringResponse(res())
-        return StringResponse(res)
+#     def GetResponse(self, req, action) :
+#         res = self.simpleRequest[req]
+#         if (callable(res)):
+#             return StringResponse(res())
+#         return StringResponse(res)
 
 class StringResponse(object):
     def __init__(self, message):
@@ -225,7 +203,7 @@ class EmulatorTCPServer(Server) :
         self.machine = MachineImpl()
 
         # Read configuration from yaml, now just create it as Hard coded
-        self.serverConfiguration.AddRequest(BulkRequest())
+        # self.serverConfiguration.AddRequest(BulkRequest())
         super(EmulatorTCPServer, self).__init__(host, port, lock)
 
     # override the listen function
@@ -352,7 +330,7 @@ def usage() :
 if __name__ == "__main__" :
     argv_par = sys.argv
 
-    logger = logging.getLogger('TEST EmulatorTCPServer')
+    logger = logging.getLogger('AmePad TCP Emulator ')
     #logger.setLevel(logging.INFO)
 
     for t in argv_par:
