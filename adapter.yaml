@@ -1,0 +1,11 @@
+adapter:
+  service: Oqton adapter for BigRep Web Interface
+  port: 7878
+  scandelay: 2500
+
+connection:
+  host: http://localhost
+  port: 8080
+  timeout: 200
+  retryDelay: 1000
+  maxConsecutiveFailNum: 5
