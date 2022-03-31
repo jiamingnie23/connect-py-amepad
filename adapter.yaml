@@ -4,8 +4,8 @@ adapter:
   scandelay: 2500
 
 connection:
-  host: http://localhost
-  port: 8080
+  host: 0.0.0.0
+  port: 8000
   timeout: 200
   retryDelay: 1000
   maxConsecutiveFailNum: 5

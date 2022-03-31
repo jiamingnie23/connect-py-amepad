@@ -1,6 +1,5 @@
 import logging
 import random
-from signal import pause
 from decimal import Decimal
 import socket
 import sys
@@ -188,10 +187,21 @@ class AmepadMachine(object):
 #                 return _req.GetResponse(req, action)
 
 #         return None
+
+class TCPEmulator(object):
+    def __init__(self, host, port):
+        self.machine = AmepadMachine()
+        self.host = host 
+        self.port = port 
+        self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     
+    def start_server(self):
+        self.server.connect(self.host, self.port)
+        
+
 #######################################################
 # The TCP Server
-class EmulatorTCPServer(Server) :
+class EmulatorTCPServer(Server):
     def __init__(self, host, port, lock) :
         self.ExitAdapterFlag = True
         #self.serverConfiguration = ServerConfiguration()
@@ -206,7 +216,7 @@ class EmulatorTCPServer(Server) :
         self.sock.listen(10)
         while True:
             client, address = self.sock.accept()
-            client.settimeout(600)
+            #client.settimeout(600)
             self.logger.debug('Client connected at: %s:%s',address[0],address[1])
             #client.sendall(message)
             port = address[1]
@@ -282,16 +292,6 @@ class EmulatorTCPServer(Server) :
                     resp_msg = resp_msg + "\n"
                     client.sendall(resp_msg) 
                     
-                    # if '* PING' in data:
-                    #     heartbeats = True
-                    #     data = ""
-                    #     self.heartbeat_count = self.heartbeat_count + 1
-                    #     buff = '* PONG 30000\n'
-                    #     self.logger.debug(str(self.heartbeat_count) + " " + buff.replace('\n', '\\n'))
-                    #     client.sendall(buff)
-                    # else :
-                    #     if (self.ProcessUnknownData(client, data)) :
-                    #         data = ''
                 except:
                     pass
 
@@ -299,39 +299,6 @@ class EmulatorTCPServer(Server) :
             self.logger.debug(e)
             client.close()
             return False
-
-    # def ProcessUnknownData(self, client, data):
-    #     if ('\n' in data) :
-    #         message = data
-    #         self.logger.debug("EmulatorTCPServer::DealWithUnknownData")
-
-    #         try :
-    #             # Deal with request, remove the \r, \n and space
-    #             message = message.replace('\n', '').replace('\r', '').replace(' ', '')
-    #             messages = message.split(',')
-    #             if ((messages is not None) and (len(messages) >= 1)) :
-    #                 if len(messages) > 1:
-    #                     action = messages[1]
-    #                 else:
-    #                     action = None
-    #                 response = self.serverConfiguration.ProcessRequest(messages[0], action)
-    #                 if (response is not None) :
-    #                     responseMsg = str(response.GetResponse())
-    #                     #print responseMsg
-    #                     client.sendall(responseMsg + '\n')
-    #                 else:
-    #                     client.sendall("?," + messages[0] + '\n')
-    #                 return True
-
-    #             # Wow, unknonw data
-    #             client.sendall('PLC:Alive\n')
-    #         except BaseException as e:
-    #             self.logger.debug("EmulatorTCPServer::Process data met exception: " + e)
-    #         finally :
-    #             return True
-
-    #     # Not end input, let parent deal with it
-    #     return False
 
     def close(self) :
         pass
@@ -342,7 +309,7 @@ def StartEmulatorTCPServer(host, port) :
             )
 
     logger = logging.getLogger('TEST EmulatorTCPServer')
-    msg = "Start Shining TCP server on host:%s, port:%s\n" % (host, port)
+    msg = "Start Amepad TCP server on host:%s, port:%s\n" % (host, port)
     logger.debug(msg)
 
     lock = threading.Lock()

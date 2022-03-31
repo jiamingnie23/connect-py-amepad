@@ -1,9 +1,5 @@
-from curses.ascii import DEL
-import json
-from urllib import request
-import yaml 
-import logging 
-import socket 
+import socket
+import json 
 DELIMETER = '\n'
 
 class AmepadClient(object):
@@ -12,36 +8,36 @@ class AmepadClient(object):
         self.logger = logger
         self.machine_ip = machine_ip
         self.machine_port = machine_port
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.tcp_client = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+        self.tcp_client.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         self.connected = False
     
     def _connect(self):
         try:
             self.logger.info("Trying to connect to " + str(self.machine_ip) + ":" + str(self.machine_port))
-            self.socket.connect((self.machine_ip, self.machine_port))
+            self.tcp_client.connect((self.machine_ip, self.machine_port))
             self.connected = True 
             return True 
         except socket.error as ex:
-            self.debug("Failed to connect. Exception: " + str(ex))
+            self.logger.debug("Failed to connect. Exception: " + str(ex))
             # close connection
-            self.socket.close()
+            self.tcp_client.close()
             self.connected = False
             return False
     
     def _disconnect(self):
-        self.socket.close()
+        self.tcp_client.close()
         self.connected = False
     
     def _sendCommandImp(self, cmd):
         try:
-            if self.connected == False:
-                return None 
-                
-            self._sendRequest(cmd)
-            for line in self._readline():
-                line = line.decode('gb18030', 'ignore').encode('utf-8')
-                self.logger.debug(line)
-                return line
+            #self._connect() #connect to server
+            #self._sendRequest(cmd)
+            return self._sendRequet2(cmd)
+            # for line in self._readline():
+            #     line = line.decode('gb18030', 'ignore').encode('utf-8')
+            #     self.logger.debug(line)
+            #     return line
                 
         except BaseException as ex:
             self.logger.error("Could not send Command {}: {}\n".format(cmd, ex))
@@ -49,16 +45,39 @@ class AmepadClient(object):
     
     def get_status_data(self, request):
         status_data = self._sendCommandImp(request)
+        status_data = self._convert_str_to_dict(status_data)
         return status_data
             
-    def get_info_data(self):
+    def get_info_data(self, request):
         info_data = self._sendCommandImp(request)
+        info_data = self._convert_str_to_dict(info_data)
         return info_data
     
+    def _convert_str_to_dict(self, msg):
+        if msg is None:
+            return msg 
+        else:
+            first_idx = msg.find("{")
+            sub_msg = msg[first_idx:]
+            msg_in_dict = json.loads(sub_msg)
+            return msg_in_dict
+        
     def _sendRequest(self, cmd):
         request = cmd + DELIMETER
-        self.socket.sendall(request)
+        self.tcp_client.sendall(request)
     
+    def _sendRequet2(self, cmd):
+        buffering = True 
+        BUFFER_SIZE = 4096
+        request = cmd + '\r' + '\n'
+        
+        while buffering:
+            self.tcp_client.send(request)
+            response = self.tcp_client.recv(BUFFER_SIZE)
+            data = response.decode()
+            return data 
+        #self.tcp_client.close()
+        
     def _readline(self):
         MAX_LINE_LENGTH = 4096000
         BUFFER_SIZE = 4096
