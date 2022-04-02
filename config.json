@@ -1,0 +1,259 @@
+{
+    "schemaVersion": "0.1", 
+    "deploymentConfig": {
+        "custom_modules": {}, 
+        "system_modules": {
+            "hermes_server": {
+                "image": "quay.io/oqton/hermes-server:staging", 
+                "type": "SystemGeneral", 
+                "mem_limit": "400m", 
+                "ports": {
+                    "5000": 5001
+                }
+            }, 
+            "oqton_iot_agent": {
+                "image": "quay.io/oqton/connect-agent:1.0.0-rc.5", 
+                "cmd": [
+                    "debug", 
+                    "/home/config/agent.cfg"
+                ], 
+                "version": "v1.4", 
+                "volumes": {
+                    "CONFIG_FOLDER": "/home/config"
+                }, 
+                "type": "IoTAgent", 
+                "ports": {
+                    "5000": ""
+                }, 
+                "templatePath": "agent"
+            }, 
+            "hermes": {
+                "envs": {
+                    "HERMES_SERVER_HOST": ""
+                }, 
+                "image": "quay.io/oqton/hermes:dev", 
+                "type": "SystemGeneral", 
+                "mem_limit": "800m", 
+                "ports": {
+                    "4200": 4200
+                }
+            }, 
+            "websocket-dc-client": {
+                "envs": {
+                    "FILEVAULT_ENDPOINT": "https://api.cloud.oqton.ai/graphql", 
+                    "LOGLEVEL": "DEBUG", 
+                    "ZMQ_BROKER_PUB": "tcp://message_broker:5556", 
+                    "SOCKET_IO_ENDPOINT": "https://websocket-dc.cloud.oqton.ai", 
+                    "ZMQ_BROKER_SUB": "tcp://message_broker:5555", 
+                    "OQTON_API_HOST": "https://api.cloud.oqton.ai"
+                }, 
+                "image": "quay.io/oqton/websocket-dc-client:kshitij", 
+                "internal": true, 
+                "volumes": {
+                    "/home/docker_adman/filevault/": "/filevault"
+                }, 
+                "mem_limit": "800m", 
+                "type": "SystemGeneral"
+            }, 
+            "oqton_iot_rest_api_indexer": {
+                "envs": {
+                    "HEARTBEAT_FREQUENCY": "10", 
+                    "OQTON_API_HOST": "api.cloud.oqton.ai", 
+                    "LOGLEVEL": "DEBUG", 
+                    "DATA_FREQUENCY": "5"
+                }, 
+                "image": "quay.io/oqton/iot-connect-rest-api-indexer:1.0.0-rc.6", 
+                "internal": true, 
+                "type": "SystemGeneral", 
+                "mem_limit": "800m"
+            }, 
+            "event_emitter": {
+                "image": "quay.io/oqton/event-emitter:0.4.0-rc.3", 
+                "cmd": [
+                    "sh", 
+                    "-c", 
+                    "dockerize -wait tcp://message_broker:5555 -timeout 300s -wait-retry-interval 10s /entrypoint.sh"
+                ], 
+                "type": "SystemGeneral", 
+                "mem_limit": "200m"
+            }, 
+            "hydra_proto_translator": {
+                "envs": {
+                    "ZMQ_HOSTNAME": "message_broker"
+                }, 
+                "image": "quay.io/oqton/hydra-proto-translator:1.2.0-rc.1", 
+                "cmd": [
+                    "sh", 
+                    "-c", 
+                    "dockerize -wait tcp://message_broker:5555 -timeout 300s -wait-retry-interval 10s ./app/hydraprototranslator.pex"
+                ], 
+                "mem_limit": "200m", 
+                "type": "SystemGeneral", 
+                "ports": {
+                    "1935": 1935
+                }
+            }, 
+            "mtc_indexer": {
+                "image": "quay.io/oqton/mtconnect-indexer:0.8.0-rc.1", 
+                "cmd": [
+                    "sh", 
+                    "-c", 
+                    "dockerize -wait tcp://hydra_proto_translator:1935 -timeout 300s -wait-retry-interval 10s ./build/out/mtconnect-indexer runserver --heartbeat 999999 --host 0.0.0.0 --agent-host 0.0.0.0"
+                ], 
+                "mem_limit": "500m", 
+                "type": "SystemGeneral", 
+                "ports": {
+                    "7879": 7879
+                }, 
+                "restart": "always"
+            }, 
+            "logstash_trans": {
+                "image": "quay.io/oqton/logstash-translator:latest", 
+                "type": "SystemGeneral", 
+                "mem_limit": "50m", 
+                "ports": {
+                    "1937": 1937
+                }
+            }, 
+            "dmd-service": {
+                "envs": {
+                    "LOGLEVEL": "DEBUG", 
+                    "TOASTER": "10.70.4.51", 
+                    "ZMQ_BROKER": "message_broker"
+                }, 
+                "image": "quay.io/oqton/dmd-service:1.0.0-rc.9", 
+                "internal": true, 
+                "volumes": {
+                    "/home/docker_adman/filevault/": "/filevault"
+                }, 
+                "mem_limit": "800m", 
+                "type": "SystemGeneral"
+            }, 
+            "aws_indexer": {
+                "envs": {
+                    "AWS_GREENGRASS_CREDENTIALS_PROFILE": "${AWS_GREENGRASS_CREDENTIALS_PROFILE}", 
+                    "BATCH_INTERVAL": 1, 
+                    "AWS_PRIVATE_KEY_FILENAME": "${AWS_PRIVATE_KEY_FILENAME}", 
+                    "AWS_GG_CONFIGURATION": "${OQTON_GATEWAY_ENVIRONMENT}", 
+                    "AWS_GREENGRASS_CORE_ARN": "${AWS_GREENGRASS_CORE_ARN}", 
+                    "AWS_CERTIFICATE_FILENAME": "${AWS_CERTIFICATE_FILENAME}", 
+                    "AWS_SECRET_ACCESS_KEY": "${AWS_PROFILE_ACTIVE_SECRET_ACCESS_KEY}", 
+                    "AWS_SENSOR_TOPIC": "3ds/device_v2", 
+                    "AWS_IOT_ENDPOINT": "${AWS_IOT_ENDPOINT}", 
+                    "DEVICE_ID": "5555-${OQTON_EDGE_ID}", 
+                    "AWS_ACCESS_KEY_ID": "${AWS_PROFILE_ACTIVE_ACCESS_KEY_ID}", 
+                    "AWS_GREENGRASS_REGION": "${AWS_GREENGRASS_REGION}"
+                }, 
+                "image": "quay.io/oqton/aws-iot-indexer:1.0.0-rc.4", 
+                "internal": true, 
+                "volumes": {
+                    "/home/docker_adman/secrets": "/app/secrets", 
+                    "/home/docker_adman/.aws": "/root/.aws"
+                }, 
+                "mem_limit": "800m", 
+                "type": "SystemGeneral"
+            }, 
+            "adapter_dashboard": {
+                "envs": {
+                    "localhost": ""
+                }, 
+                "image": "quay.io/oqton/adapter-dashboard:latest", 
+                "type": "SystemGeneral", 
+                "mem_limit": "800m", 
+                "ports": {
+                    "4200": 4300
+                }
+            }, 
+            "oqton_iot_agent_jobs": {
+                "image": "quay.io/oqton/connect-agent-jobs:1.0.0-rc.20", 
+                "cmd": [
+                    "debug", 
+                    "/home/config/config.yml"
+                ], 
+                "type": "SystemGeneral", 
+                "volumes": {
+                    "CONFIG_FOLDER": "/home/config", 
+                    "CONFIG_FOLDER/data": "/home/data"
+                }
+            }, 
+            "oqton_iot_mqtt_broker": {
+                "image": "eclipse-mosquitto:1.6", 
+                "type": "MqttBroker", 
+                "ports": {
+                    "1883": 1883
+                }, 
+                "volumes": {
+                    "CONFIG_FOLDER": "/mosquitto/config/"
+                }
+            }, 
+            "aws_greengrass": {
+                "envs": {
+                    "AWS_GG_CONFIGURATION": "${OQTON_GATEWAY_ENVIRONMENT}", 
+                    "DEVICE_ID": "5555-${OQTON_EDGE_ID}"
+                }, 
+                "image": "quay.io/oqton/aws-iot-greengrass:1.0.0-rc.4", 
+                "internal": true, 
+                "entrypoint": "/greengrass-entrypoint.sh", 
+                "volumes": {
+                    "/tmp/log": "/greengrass/ggc/var/log", 
+                    "/home/docker_adman/gg/config": "/greengrass/config", 
+                    "/home/docker_adman/gg/ggc/deployment": "/greengrass/ggc/deployment", 
+                    "/home/docker_adman/gg/certs": "/greengrass/certs"
+                }, 
+                "mem_limit": "800m", 
+                "type": "SystemGeneral", 
+                "ports": {
+                    "8883": 8883
+                }
+            }, 
+            "logstash_enricher": {
+                "image": "quay.io/oqton/logstash-enricher:staging", 
+                "type": "SystemGeneral", 
+                "mem_limit": "750m", 
+                "ports": {
+                    "5045": 5045, 
+                    "5043": 5043
+                }
+            }, 
+            "conman_translator": {
+                "image": "quay.io/oqton/conman-translator:staging", 
+                "type": "SystemGeneral", 
+                "mem_limit": "100m"
+            }, 
+            "message_broker": {
+                "envs": {
+                    "LOGLEVEL": "DEBUG"
+                }, 
+                "image": "quay.io/oqton/message-broker:1.1.0-rc.1", 
+                "type": "SystemGeneral", 
+                "ports": {
+                    "5555": 5555, 
+                    "5556": 5556
+                }
+            }, 
+            "3dcman": {
+                "envs": {
+                    "ZMQ_HOSTNAME": "message_broker", 
+                    "LOGLEVEL": "DEBUG", 
+                    "HPT_HOSTNAME": "hydra_proto_translator", 
+                    "ZMQ_BROKER_SUB": 5555, 
+                    "ZMQ_BROKER_PUB": 5556
+                }, 
+                "image": "quay.io/oqton/3dcman:1.0.0-rc.0", 
+                "cmd": [
+                    "sh", 
+                    "-c", 
+                    "dockerize -wait tcp://hydra_proto_translator:1935 -timeout 300s -wait-retry-interval 10s ./app/adapter-manager.pex"
+                ], 
+                "internal": true, 
+                "type": "SystemGeneral", 
+                "restart": "always"
+            },
+            "modules_overrides": {
+                "bigrep_stack_piolot":{
+                   "image": "quay.io/oqton/connect-py-bigrep:commit-cf038cc3"
+                }
+            }
+        }
+    }
+}

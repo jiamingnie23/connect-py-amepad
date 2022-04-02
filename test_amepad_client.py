@@ -34,13 +34,13 @@ def test_info_data():
 
 def test_amepad_client():
     amepad_client = get_sample_amepad_client()
-    amepad_client._connect()
+    #amepad_client._connect()
     get_status_cmd = 'getstatus'
-    get_info_cmd = 'getinfo'
+    #get_info_cmd = 'getinfo'
     get_status_res = amepad_client.get_status_data(get_status_cmd)
     print("Amepad Status Data: %s " % str(get_status_res))
-    get_info_res = amepad_client.get_info_data(get_info_cmd)
-    print("Amepad Info Data: " % str(get_info_res))
+    #get_info_res = amepad_client.get_info_data(get_info_cmd)
+    #print("Amepad Info Data: " % str(get_info_res))
 
 
 if __name__ == "__main__":

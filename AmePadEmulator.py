@@ -291,6 +291,8 @@ class EmulatorTCPServer(Server):
                     self.logger.info("Process Commands")
                     resp_msg = resp_msg + "\n"
                     client.sendall(resp_msg) 
+                    #client.close()
+                    client.clear()
                     
                 except:
                     pass
