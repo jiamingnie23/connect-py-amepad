@@ -1,12 +1,11 @@
-import logging
+import threading 
 import random
 from decimal import Decimal
 import socket
-import sys
 import threading
 import time
-
-from adapter_lib import Server
+import logging 
+import sys 
 
 TIME_PER_LAYER = 2 #2 seconds for printing 1 layer 
 
@@ -34,7 +33,7 @@ class AmepadMachine(object):
             "left": self.convert_time_format(self.remain_time),
             "currentfile": self.current_job_file,
             "started": self.start_job_status,
-            "pasused": self.pause_job_status,
+            "paused": self.pause_job_status,
             "ErrorCode": self.error_code
         }
     
@@ -150,187 +149,88 @@ class AmepadMachine(object):
         while True:
             self.update_machine_status()
 
-# #####################################################
-# # The request and response configuration
-# class Request(object) :
-#     def __init__(self, req, action, response):
-#         self.req = req
-#         self.action = action
-#         self.response = response
-
-#     def isInterested(self, req, action) :
-#         if (self.req.lower() == req.lower() and self.action.lower() == action.lower()) :
-#             return True
-#         return False
-
-#     def GetResponse(self) :
-#         return self.response
-
-# class StringResponse(object):
-#     def __init__(self, message):
-#         self.msg = message
-
-#     def GetResponse(self) :
-#        return self.msg
-
-# class ServerConfiguration(object) :
-#     def __init__(self) :
-#         self.requests = []
-
-#     def AddRequest(self, request) :
-#         if (request is not None) :
-#             self.requests.append(request)
-
-#     def ProcessRequest(self, req, action) :
-#         for _req in self.requests:
-#             if (_req.isInterested(req, action)) :
-#                 return _req.GetResponse(req, action)
-
-#         return None
-
-class TCPEmulator(object):
+class TCPServer(object):
     def __init__(self, host, port):
-        self.machine = AmepadMachine()
         self.host = host 
         self.port = port 
-        self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    
-    def start_server(self):
-        self.server.connect(self.host, self.port)
-        
+        self.amepad_machine = AmepadMachine()
+        self.logger = logging.getLogger("Test Amepad Emulator")
 
-#######################################################
-# The TCP Server
-class EmulatorTCPServer(Server):
-    def __init__(self, host, port, lock) :
-        self.ExitAdapterFlag = True
-        #self.serverConfiguration = ServerConfiguration()
-        self.machine = AmepadMachine()
+    def run_server(self):
+        self.logger.debug("Start Amepad TCP server on host:%s, port:%s\n" % (self.host, self.port))
+        server_thread = threading.Thread(target=self._server_on_listen)
+        server_thread.start()
+        machine_thread = threading.Thread(target=self.amepad_machine.run())
+        machine_thread.setDaemon(True)
+        machine_thread.start()
 
-        # Read configuration from yaml, now just create it as Hard coded
-        #self.serverConfiguration.AddRequest(BulkRequest())
-        super(EmulatorTCPServer, self).__init__(host, port, lock)
-
-    # override the listen function
-    def listen2(self, message):
-        self.sock.listen(10)
+    def _server_on_listen(self):
+        server_socket = socket.socket()
+        server_socket.bind((self.host, self.port))
+        server_socket.listen(2)
         while True:
-            client, address = self.sock.accept()
-            #client.settimeout(600)
-            self.logger.debug('Client connected at: %s:%s',address[0],address[1])
-            #client.sendall(message)
-            port = address[1]
-            self.mClientList[port] = client
-            threading.Thread(target = self.communicateWithClient2,args = (client,address)).start()
+            self._server_communication(server_socket)
 
-            self.t1 = threading.Thread(target=self.machine.run())
-            self.t1.setDaemon(True)
-            self.t1.start()
+    def _server_communication(self, server_socket):
+        # server_socket = socket.socket()
+        # server_socket.bind((self.host,self.port))
 
-    def communicateWithClient2(self, client, address):
-        self.heartbeat_count = 0
-        try:
-            self.logger.debug('TCPhandle')
-            data = ""
-            buff = ""
-            heartbeats = False
-            while True:
-                try:
-                    buff = client.recv(1024)
-                except socket.timeout as e:
-                    if not heartbeats:
-                        continue
-                    else:
-                        self.logger.debug(e)
-                        client.close()
-                        return False
+        # server_socket.listen(2)
+        # server_socket = socket.socket()
+        # server_socket.bind((self.host, self.port))
+        # server_socket.listen(2)
+        conn, address = server_socket.accept()  # accept new connection
+        print("Connection from: " + str(address))
+        #while True:
+        # receive data stream. it won't accept data packet greater than 1024 bytes
+        data = conn.recv(1024).decode()
+        # if not data:
+        #     # if data is not received break
+        #     break
+        # remove character 
+        data = data.replace("\n","")
+        data = data.replace("\r","")
+        print("from connected user: " + str(data))
+        self.logger.info("Process input: " + str(data))
+        if data == "getstatus":
+            resp_msg = self.amepad_machine.get_machine_status()
+        elif data == "getinfo":
+            resp_msg = self.amepad_machine.get_machine_info()
+        elif data == "start":
+            resp_msg = self.amepad_machine.start_job()
+        elif data == "pause":
+            resp_msg = self.amepad_machine.pause_job()
+        elif data == "stop":
+            resp_msg = self.amepad_machine.stop_job()
+        elif data == "resume":
+            resp_msg = self.amepad_machine.resume_job()
+        elif "open" in data:    
+            data_split = data.split()  
+            try:     
+                open_command = data_split[0]
+                file_name = data_split[1]    
+                resp_msg = self.amepad_machine.open_file(file_name)       
+            except Exception as e:
+                self.logger.error("Met Exception in Command: %s " %str(e))
+                resp_msg = "Open File Format is not right"
+        else:
+            resp_msg = "Invalid Command."
+        
+        #data = "" #clear the data
+        '''send back the message'''
+        self.logger.info("Process Commands")
+        resp_msg = resp_msg + "\n"
 
-                if not buff: break
-                with self.lock:
-                    data = data + buff
-                self.logger.debug('recv()->"%s"', buff.replace('\n','\\n'))
-
-                try:
-                    # Command: 
-                    # Open File 
-                    # Start 
-                    # Pause 
-                    # Resume 
-                    # getstatus
-                    # getinfo
-                    resp_msg = ""
-                    data = data.replace("\n","")
-                    data = data.replace("\r","")
-                    print(data)
-                    if data == "getstatus":
-                        resp_msg = self.machine.get_machine_status()
-                    elif data == "getinfo":
-                        resp_msg = self.machine.get_machine_info()
-                    elif data == "start":
-                        resp_msg = self.machine.start_job()
-                    elif data == "pause":
-                        resp_msg = self.machine.pause_job()
-                    elif data == "stop":
-                        resp_msg = self.machine.stop_job()
-                    elif data == "resume":
-                        resp_msg = self.machine.resume_job()
-                    elif "open" in data:    
-                        data_split = data.split()  
-                        try:     
-                            open_command = data_split[0]
-                            file_name = data_split[1]    
-                            resp_msg = self.machine.open_file(file_name)       
-                        except Exception as e:
-                            self.logger.error("Met Exception in Command: %s " %str(e))
-                            resp_msg = "Open File Format is not right"
-                    else:
-                        resp_msg = "Invalid Command."
-                    
-                    data = "" #clear the data
-                    '''send back the message'''
-                    self.logger.info("Process Commands")
-                    resp_msg = resp_msg + "\n"
-                    client.sendall(resp_msg) 
-                    
-                except:
-                    pass
-
-        except Exception as e:
-            self.logger.debug(e)
-            client.close()
-            return False
-
-    def close(self) :
-        pass
-
-def StartEmulatorTCPServer(host, port) :
-    logging.basicConfig(level=logging.DEBUG,
-            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-            )
-
-    logger = logging.getLogger('TEST EmulatorTCPServer')
-    msg = "Start Amepad TCP server on host:%s, port:%s\n" % (host, port)
-    logger.debug(msg)
-
-    lock = threading.Lock()
-    server = EmulatorTCPServer(host, port, lock)
-    t1 = threading.Thread(target=server.listen2, args=[msg])
-    t1.setDaemon(True)
-    t1.start()
-
-    while server.ExitAdapterFlag:
-        time.sleep(1)
-
-    # Clean up
-    logger.debug('closing socket')
-    server.close()
-    logger.debug('done')
-
+        #data = "Hi this is sample response"
+        conn.send(resp_msg.encode())  # send data to the client
+        
+        conn.close()  # close the connection
+    
 def usage() :
     print("That is not proper usage: \n")
     print('python TCPServerEmulator.py host port\n')
-
-if __name__ == "__main__":
+    
+if __name__ == '__main__':
     argv_par = sys.argv
 
     logger = logging.getLogger('Amepad Server Emulator')
@@ -345,5 +245,5 @@ if __name__ == "__main__":
 
     host = argv_par[1]
     port = int(argv_par[2])
-    StartEmulatorTCPServer(argv_par[1], port)
-    
+    tcp_server = TCPServer(host, port)
+    tcp_server.run_server()

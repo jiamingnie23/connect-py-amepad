@@ -1,7 +1,6 @@
+from multiprocessing.connection import Connection
 from adapter_lib import Adapter, Configuration, Condition, Conditions, DataItem, DataItems, Message, Messages, Server
-import threading
 import logging
-import sys
 import yaml
 
 
@@ -45,15 +44,16 @@ class AmepadConfiguration(Configuration):
         self.logger = logging.getLogger('Amepad __main__')
         super(AmepadConfiguration, self).__init__()
 
-        #self.serialConfigEnabled = True
-
-        #self.portName = None
-        #self.buadRate = 9200
-        #self.parity = 'N'
-        #self.rtscts = False
-        #self.xonxoff = False
-        #self.rts = None
-        #self.dtr = None
+        # Connection Parameters:
+        self.timeout = 100
+        self.retryDelay = 3000
+        self.maxConsecutiveFailNum = 5
+        self.host = None 
+        self.device_uuid = None 
+        self.http_server_port = None 
+        self.printer = None
+        self.hydraClient = None
+        self.hydraClient_enabled = False
 
     def parse(self, file='adapter.yaml'):
         self.logger.info('Parsing configuration file (' + file + ')')
@@ -66,45 +66,48 @@ class AmepadConfiguration(Configuration):
 
         try:
             super(AmepadConfiguration, self).parse(doc)
+            ConnectionInfo = doc['connection']
 
             try:
-                self.serialConfigEnabled = doc['serial_connection'] is not None
-                self.logger.info('serial connection enabled: ' + str(self.serialConfigEnabled))
-
-                self.portName = doc['serial_connection']['name']
-
-                # try:
-                #     self.buadRate = doc['serial_connection']['baudrate']
-                # except KeyError as e:
-                #     pass
-
-                # try:
-                #     self.parity = doc['serial_connection']['parity']
-                # except KeyError as e:
-                #     pass
-
-                # try:
-                #     self.rtscts = doc['serial_connection']['rtscts']
-                # except KeyError as e:
-                #     pass
-
-                # try:
-                #     self.xonxoff = doc['serial_connection']['xonxoff']
-                # except KeyError as e:
-                #     pass
-
-                # try:
-                #     self.rts = doc['serial_connection']['rts']
-                # except KeyError as e:
-                #     pass
-
-                # try:
-                #     self.dtr = doc['serial_connection']['dtr']
-                # except KeyError as e:
-                #     pass
-
+                host = ConnectionInfo['host']
+                self.host = host
             except KeyError as e:
-                self.serialConfigEnabled = False
+                raise ValueError("Service Host Must be Addressed")
+                
+            try:
+                port = ConnectionInfo['port']
+                self.port = port
+            except KeyError as e:
+                pass 
+
+            try: 
+                self.timeout = ConnectionInfo['timeout']
+            except KeyError as e:
+                pass 
+
+            try: 
+                self.retryDelay = ConnectionInfo['retryDelay']
+            except KeyError as e:
+                pass 
+
+            try:
+                self.maxConsecutiveFailNum = ConnectionInfo['maxConsecutiveFailNum']
+            except KeyError as e:
+                pass 
+                
+            try:
+                self.printer = doc['printer']                                
+            except KeyError as e:
+                raise KeyError("Printer name not defined %s" % self.printer)
+
+            try:
+                self.hydraClient = doc['hydraClient']   
+                self.hydraClient_enabled = self.hydraClient['enabled']
+                self.http_server_host = self.hydraClient['dmc_server_host']
+                self.http_server_port = self.hydraClient['dmc_server_port']
+                             
+            except KeyError as e:
+                raise KeyError("hydraClient not defined")
 
         except Exception as e:
             self.logger.error('HAASConfiguration.parse throw ' + e.message)
@@ -152,11 +155,3 @@ class AmepadAdapter(Adapter):
 
     def set_msg_unavailable(self, name):
         self._set_msg(name, lambda msg: msg.set_unavailable())
-
-    def set_condition_value(self, name, value):
-        condition = self.find_by_name(self.conditions(), name)
-        if not condition:
-            condition = Condition(name)
-            self.conditions_obj().add_condition(condition, self.conditions())
-        condition.set_status(value)
-

@@ -1,31 +1,22 @@
-#!/usr/bin/env python
-# -*- coding:utf-8 -*-
-#   
-#   Author  :   XueWeiHan
-#   Date    :   17/2/25 上午11:13
-#   Desc    :   测试 client
-
 import socket
 
-SERVER_ADDRESS = (HOST, PORT) = 'localhost', 8000 
 
+def client_program():
+    host = "localhost"  # as both code is running on same pc
+    port = 8080  # socket server port number
 
-def send_message(s, message):
-    """
-    发送请求
-    """
-    s.sendall(message)
+    client_socket = socket.socket()  # instantiate
+    client_socket.connect((host, port))  # connect to the server
 
+    message = "getinfo"  # take input
 
-def client():
-    message = "Hello, I'm client"
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.connect(SERVER_ADDRESS)
-    send_message(s, message)
-    print('Client is Waiting response...')
-    data = s.recv(1024)
-    s.close()
-    print('Client recv:', repr(data))  # 打印从服务器接收回来的数据
+    client_socket.send(message.encode())  # send message
+    data = client_socket.recv(1024).decode()  # receive response
+
+    print('Received from server: ' + data)  # show in terminal
+
+    client_socket.close()  # close the connection
+
 
 if __name__ == '__main__':
-    client()
+    client_program()
