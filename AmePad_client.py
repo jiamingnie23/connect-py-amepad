@@ -48,3 +48,23 @@ class AmepadClient(object):
             msg_in_dict = ast.literal_eval(sub_msg)
             return msg_in_dict
     
+    def _template_data(self, type="info"):
+        if type == "info":
+            template_info = {
+            "Name": None, 
+            "IP": None,
+            "MAC": None
+            }
+            return template_info
+        else:
+            template_status = {
+            "progress": None,
+            "used": None,
+            "left": None,
+            "currentfile": None,
+            "started": None,
+            "paused": None,
+            "ErrorCode": None
+             }
+    
+            return template_status

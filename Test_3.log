@@ -1,0 +1,7 @@
+{"level": "INFO", "loggerName": "root", "message": "Initialize data gather "}
+{"level": "ERROR", "loggerName": "root", "message": "Could not send Command getstatus: [Errno 61] Connection refused\n"}
+{"level": "ERROR", "loggerName": "root", "message": "[_gatherdata] Retrieve Machine Status Data met Exception 'AmepadDataGather' object has no attribute 'hpt'"}
+{"level": "ERROR", "loggerName": "root", "message": "Could not send Command getinfo: [Errno 61] Connection refused\n"}
+{"level": "ERROR", "loggerName": "root", "message": "[_gatherdata] Retrieve Machine Info Data met Exception 'AmepadDataGather' object has no attribute 'hpt'"}
+{"level": "INFO", "loggerName": "root", "message": " Start Fecthing and Sending Data .... "}
+{"level": "ERROR", "loggerName": "root", "message": "[serve]: got the exception 'AmepadDataGather' object has no attribute 'delayPoll'"}

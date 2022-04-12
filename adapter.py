@@ -1,4 +1,3 @@
-from multiprocessing.connection import Connection
 from adapter_lib import Adapter, Configuration, Condition, Conditions, DataItem, DataItems, Message, Messages, Server
 import logging
 import yaml
