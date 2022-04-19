@@ -1,0 +1,243 @@
+# -----------------------------------------------------------------------------
+# This YAML file is broken out into 3 main sections which are all labeled
+# below with markers that use the section name prefixed by <>-- and suffixed
+# with --<> so the template can be automatically updated going forward.
+#
+# The basic style adopted is snake_casing based on what the CircleCI 2.0 specs
+# seem to follow themselves and is the recommended coding style for now.
+#
+#  Oqton Project Section
+#
+#     Developers are free to modify this section as they see necessary.
+#
+#  Oqton Template Section
+#
+#     This section is intended to be a generic section that can be copied and
+#     pasted from one project to the next and used as a utility. The canonical
+#     up-to-date definition of this set of utilities can be found at:
+#
+#         https://wiki.oqton.com/create/Engineering/Best-Practices/CircleCI
+#
+#     Please DO NOT make project-specific edits to this section.  It should
+#     be possible to replace this section with the latest canonical definition
+#     at any time and will eventually be automated so that it is kept in sync.
+#
+#     Any edits to this section that are not contributed back risk being lost.
+#     If you want to make edits then remove the section markers below to fork.
+#
+#  CircleCI Section
+#
+#    Developers are free to modify this section as they see necessary.
+#
+# -----------------------------------------------------------------------------
+# <>-- Oqton Project --<>
+# -----------------------------------------------------------------------------
+project_environment: &project_environment {}
+project_docker_image: &project_docker_image quay.io/oqton/connect-py-bigrep
+# -----------------------------------------------------------------------------
+# <>-- Oqton Template --<>
+# -----------------------------------------------------------------------------
+oqton_docker_ops: &oqton_docker_ops
+  docker:
+    - image: quay.io/oqton/cli-ops:latest
+      auth:
+        username: ${QUAY_USERNAME}
+        password: ${QUAY_PASSWORD}
+oqton_run_build_docker_image: &oqton_run_build_docker_image
+  run:
+    name: Build Docker Image
+    command: |
+      source ${OQTON_OPS_ENV}
+      cicd_pipeline_build_docker_image
+oqton_run_test_docker_image: &oqton_run_test_docker_image
+  run:
+    name: Test Docker Image
+    command: |
+      source ${OQTON_OPS_ENV}
+      cicd_pipeline_test_docker_image
+oqton_run_push_docker_images: &oqton_run_push_docker_images
+  run:
+    name: Publish Docker Image And Artifacts
+    command: |
+      source ${OQTON_OPS_ENV}
+      cicd_pipeline_publish_artifacts
+oqton_run_post_build_step: &oqton_run_post_build_step
+  run:
+    name: Post Build Step
+    command: |
+      source ${OQTON_OPS_ENV}
+      POSTBUILD_SCRIPT=${CIRCLE_WORKING_DIRECTORY}/.circleci/postbuild.sh
+      if [[ -e $POSTBUILD_SCRIPT ]]; then
+        show_banner "Running Post Build Script"
+        source $POSTBUILD_SCRIPT
+      fi
+oqton_test_docker_ops: &oqton_test_docker_ops
+  docker:
+    - image: quay.io/oqton/test-suite:latest
+      auth:
+        username: ${QUAY_USERNAME}
+        password: ${QUAY_PASSWORD}
+oqton_test_image: &oqton_test_image
+  run:
+    name: Test Docker Image using test-suite
+    command: |
+      if [[ $(which python3) && -f "main.py" ]]; then
+        python3 main.py --tool=${OQTON_IMAGE#quay.io/oqton/tool-} --mode=success --smoke=true --version=${CIRCLE_BRANCH//\//-} --use_latest=true
+      else
+        echo "Missing requirements to use oqton_test_image"
+        exit 1
+      fi
+oqton_default_jobs: &oqton_default_jobs
+  tag_commit:
+    <<: *oqton_docker_ops
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run:
+          name: Tagging Pre-Release
+          command: |
+            source ${OQTON_OPS_ENV}
+            cicd_pipeline_tag_prerelease_and_push
+  build_commit:
+    docker:
+      - image: alpine
+    steps:
+      - run:
+          name: Building Default build_commit Job
+          command: |
+            echo Override this default job by adding a build_commit job to your project.
+  build_feature:
+    <<: *oqton_docker_ops
+    environment:
+      <<: *project_environment
+      OQTON_IMAGE: *project_docker_image
+    working_directory: /circleci
+    steps:
+      - run:
+          name: Running Default build_feature Job
+          command: |
+            echo Override this default job by adding a build_feature job to your project.
+      - checkout
+      - attach_workspace:
+          at: /circleci
+      - setup_remote_docker
+      - *oqton_run_build_docker_image
+      - *oqton_run_test_docker_image
+      - *oqton_run_push_docker_images
+      - *oqton_run_post_build_step
+  build_tag:
+    <<: *oqton_docker_ops
+    environment:
+      <<: *project_environment
+      OQTON_IMAGE: *project_docker_image
+    working_directory: /circleci
+    steps:
+      - run:
+          name: Running Default build_tag Job
+          command: |
+            echo Override this default job by adding a build_tag job to your project.
+      - checkout
+      - attach_workspace:
+          at: /circleci
+      - setup_remote_docker
+      - *oqton_run_build_docker_image
+      - *oqton_run_test_docker_image
+      - *oqton_run_push_docker_images
+      - *oqton_run_post_build_step
+  test_feature:
+    <<: *oqton_test_docker_ops
+    environment:
+      <<: *project_environment
+      OQTON_IMAGE: *project_docker_image
+    working_directory: /home
+    steps:
+      - *oqton_test_image
+oqton_default_workflows: &oqton_default_workflows
+  version: 2
+  untagged_master:
+    jobs:
+      - tag_commit:
+          context: org-global
+          filters:
+            branches:
+              only: master
+            tags:
+              ignore: /^.+$/
+  tagged_master:
+    jobs:
+      - build_commit:
+          context: org-global
+          filters:
+            branches:
+              ignore: /^.+$/
+            tags:
+              only: /^v[0-9]+\.[0-9]+\.[0-9]+.*$/
+      - build_tag:
+          context: org-global
+          filters:
+            branches:
+              ignore: /^.+$/
+            tags:
+              only: /^v[0-9]+\.[0-9]+\.[0-9]+.*$/
+          requires:
+            - build_commit
+  feature_branch:
+    jobs:
+      - build_commit:
+          context: org-global
+          filters:
+            branches:
+              only: /^feature/.+$/
+            tags:
+              ignore: /^.+$/
+      - build_feature:
+          context: org-global
+          filters:
+            branches:
+              only: /^feature/.+$/
+            tags:
+              ignore: /^.+$/
+          requires:
+            - build_commit
+      - test_feature:
+          context: org-global
+          filters:
+            branches:
+              only: /^feature/.+$/
+            tags:
+              ignore: /^.+$/
+          requires:
+            - build_commit
+            - build_feature
+# -----------------------------------------------------------------------------
+# <>-- CircleCI --<>
+# -----------------------------------------------------------------------------
+version: 2
+jobs:
+  <<: *oqton_default_jobs
+  build_commit:
+    docker:
+      - image: python:2.7.14-slim-stretch
+    working_directory: /src/github.com/oqton/iot-connect-py-bigrep
+    steps:
+      - run: |
+          apt update
+          apt -y install make binutils git build-essential
+      - checkout
+      - run: git submodule update --init
+      - setup_remote_docker
+      - run:
+          name: Building Source
+          command: |
+            if curl -fH "Authorization: Bearer ${QUAY_TOKEN}" \
+                https://quay.io/api/v1/repository/oqton/connect-py-bigrep/tag/commit-${CIRCLE_SHA1:0:8}/images > /dev/null; then
+                echo Docker image already exists so skipping the source build.
+                exit 0
+            fi
+            make build
+      - persist_to_workspace:
+          root: /src/github.com/oqton/iot-connect-py-bigrep
+          paths:
+            - "*"
+workflows:
+  <<: *oqton_default_workflows
